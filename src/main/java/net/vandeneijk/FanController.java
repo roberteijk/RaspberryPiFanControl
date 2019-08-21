@@ -60,7 +60,7 @@ public class FanController {
                 welcomeDisplayed = true;
             }
 
-            if (!fanRunning &&  maxIntervalFanSpins > 0 && fanLastRun + maxIntervalFanSpins < System.currentTimeMillis()) fanController(true, info + "Fan started for daily anti-dust run.");
+            if (!fanRunning &&  maxIntervalFanSpins > 0 && fanLastRun + maxIntervalFanSpins < System.currentTimeMillis()) fanController(true, info + "Fan started for anti-dust run.");
             if (!fanRunning && cpuTemp >= maxTemp) fanController(true, info + "Fan started because temp is too high!!!");
             if (fanRunning && fanLastRun + minDuration < System.currentTimeMillis() && cpuTemp <= minTemp) fanController(false, info + "Fan stopped. Everything is ok.");
         }
@@ -155,7 +155,7 @@ public class FanController {
      */
     private static void printInfo() {
         System.out.println();
-        System.out.println("Raspberry Pi Fan Controller v1.2.0");
+        System.out.println("Raspberry Pi Fan Controller v1.2.1");
         System.out.println();
         System.out.println(" developed by: Robert van den Eijk");
         System.out.println(" fan control pin (Pi4J): " + mFanPin.getPin());
