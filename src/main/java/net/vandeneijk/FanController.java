@@ -19,14 +19,15 @@ import java.util.List;
 
 public class FanController {
 
-    // Class variables with setup values.
-    private static final GpioController mGpio = GpioFactory.getInstance();
-    private static final GpioPinDigitalOutput mFanPin = mGpio.provisionDigitalOutputPin(RaspiPin.GPIO_00, PinState.LOW);
+    // Class variables for setup values.
+    private static int controlPin = 0;
     private static double cpuTemp = 67; // A safe temporary value that doesn't trigger any action until the first measurement.
     private static double minTemp = 50;
     private static double maxTemp = 75;
     private static long minDuration = 300_000;
     private static long maxIntervalFanSpins = 0; // 0 = disabled. Can be used the purge dust buildup surrounding the fan.
+    private static final GpioController mGpio = GpioFactory.getInstance();
+    private static GpioPinDigitalOutput mFanPin;
 
     // Class variables to keep track of program state.
     private static long fanLastRun;
@@ -37,6 +38,8 @@ public class FanController {
 
     public static void main(String[] args) {
         testArgs(args);
+        mFanPin = mGpio.provisionDigitalOutputPin(RaspiPin.getPinByAddress(controlPin), PinState.LOW);
+        addShutdownHook(mFanPin);
         printInfo();
 
         while (true) {
@@ -51,6 +54,7 @@ public class FanController {
             }
 
             String info = ldt + "  -  " + cpuTemp + "c  :  ";
+
             if (!welcomeDisplayed) {
                 System.out.println(info + "Measurement started.");
                 welcomeDisplayed = true;
@@ -63,6 +67,8 @@ public class FanController {
     }
 
     private static void testArgs(String[] args) {
+        int controlPinLowest = 0;
+        int controlPinHighest = 31;
         double minTempLowest = 30;
         double minTempHighest = 65;
         double maxTempLowest = 70;
@@ -82,6 +88,10 @@ public class FanController {
             }
             try {
                 switch(currentArg[0]) {
+                    case "pin":
+                        controlPin = Integer.parseInt(currentArg[1]);
+                        if (controlPin < controlPinLowest || controlPin > controlPinHighest) faultyArgs.add(arg + "  Value is outside the accepted range (" + controlPinLowest + " - " + controlPinHighest + ").");
+                        break;
                     case "min":
                         minTemp = Double.parseDouble(currentArg[1]);
                         if (minTemp < minTempLowest || minTemp > minTempHighest) faultyArgs.add(arg + "  Value is outside the accepted range (" + minTempLowest + " - " + minTempHighest + ").");
@@ -122,8 +132,9 @@ public class FanController {
         }
         System.out.println();
         System.out.println();
-        System.out.println("Parameters:");
+        System.out.println("Parameters (any combination is valid):");
         System.out.println();
+        System.out.println("  pin=<value> = Fan control pin according Pi4J pinout");
         System.out.println("  min=<value> = Temp (c) at which the fan will turn off.");
         System.out.println("  max=<value> = Temp (c) at which the fan will turn on.");
         System.out.println("  dur=<value> = Minimum duration (seconds) the fan runs.");
@@ -131,7 +142,7 @@ public class FanController {
         System.out.println();
         System.out.println("Parameter usage example:");
         System.out.println();
-        System.out.println("  min=45 max=82 dur=600 dus=24");
+        System.out.println("  pin=1 min=45 max=82 dur=600 dus=24");
         System.out.println();
         System.out.println();
 
@@ -144,7 +155,7 @@ public class FanController {
      */
     private static void printInfo() {
         System.out.println();
-        System.out.println("Raspberry Pi Fan Controller v1.1.0");
+        System.out.println("Raspberry Pi Fan Controller v1.2.0");
         System.out.println();
         System.out.println(" developed by: Robert van den Eijk");
         System.out.println(" fan control pin (Pi4J): " + mFanPin.getPin());
@@ -163,5 +174,17 @@ public class FanController {
 
         if (startFan) mFanPin.setState(PinState.HIGH);
         else mFanPin.setState(PinState.LOW);
+    }
+
+    /**
+     * This will prevent the fan from spinning endlessly when CTRL-C is pressed when the fan is on. This thread will only start when the VM is
+     * shutting down.
+     *
+     * @param mFanPin
+     */
+    private static void addShutdownHook(GpioPinDigitalOutput mFanPin) {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (mFanPin != null) mFanPin.setState(PinState.LOW);
+        }));
     }
 }
